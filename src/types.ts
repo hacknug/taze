@@ -281,6 +281,13 @@ export interface InteractiveContext {
   isChecked: (dep: RawDep) => boolean
 }
 
+export interface RenderChangeContext {
+  interactive?: InteractiveContext
+  grouped: boolean
+  timediff: boolean
+  nodecompat: boolean
+}
+
 export interface Addon {
   postprocess?: (
     pkg: PackageMeta,
@@ -291,4 +298,30 @@ export interface Addon {
     pkg: PackageMeta,
     options: CheckOptions,
   ) => void | Promise<void>
+
+  beforeRenderChange?: (
+    columns: string[],
+    change: ResolvedDepChange,
+    context: RenderChangeContext,
+  ) => string[] | Promise<string[]>
+
+  afterRenderChange?: (
+    columns: string[],
+    change: ResolvedDepChange,
+    context: RenderChangeContext,
+  ) => string[] | Promise<string[]>
+
+  beforeRenderChanges?: (
+    lines: string[],
+    pkg: PackageMeta,
+    options: CheckOptions,
+    interactive?: InteractiveContext,
+  ) => string[] | Promise<string[]>
+
+  afterRenderChanges?: (
+    lines: string[],
+    pkg: PackageMeta,
+    options: CheckOptions,
+    interactive?: InteractiveContext,
+  ) => string[] | Promise<string[]>
 }

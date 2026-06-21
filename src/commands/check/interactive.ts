@@ -78,16 +78,17 @@ export async function promptInteractive(pkgs: PackageMeta[], options: CheckOptio
     }
 
     return {
-      render() {
+      async render() {
         const sr = createSliceRender()
         const Y = (v: string) => c.bold.green(v)
         sr.push({ content: `${FIG_BLOCK} ${c.gray`${Y('↑↓')} to select, ${Y('space')} to toggle, ${Y('→')} to change version`}`, fixed: true })
         sr.push({ content: `${FIG_BLOCK} ${c.gray`${Y('enter')} to confirm, ${Y('esc')} to cancel, ${Y('a')} to select/unselect all`}`, fixed: true })
         sr.push({ content: '', fixed: true })
 
-        pkgs.forEach((pkg) => {
-          sr.push(...renderChanges(pkg, options, ctx).lines.map(x => ({ content: x })))
-        })
+        for (const pkg of pkgs) {
+          const { lines } = await renderChanges(pkg, options, ctx)
+          sr.push(...lines.map(x => ({ content: x })))
+        }
 
         sr.render(index)
       },
@@ -256,6 +257,6 @@ interface TerminalKey {
 }
 
 interface InteractiveRenderer {
-  render: () => void
+  render: () => void | Promise<void>
   onKey: (key: TerminalKey) => boolean | InteractiveRenderer | void
 }
