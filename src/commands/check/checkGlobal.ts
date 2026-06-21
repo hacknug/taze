@@ -57,7 +57,7 @@ export async function checkGlobal(options: CheckOptions) {
   if (options.interactive)
     resolvePkgs = await promptInteractive(resolvePkgs, options) as GlobalPackageMeta[]
 
-  const { lines, errLines } = renderPackages(resolvePkgs, options)
+  const { lines, errLines } = await renderPackages(resolvePkgs, options)
 
   const hasChanges = resolvePkgs.length && resolvePkgs.some(i => i.resolved.some(j => j.update))
   if (!hasChanges) {

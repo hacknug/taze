@@ -7,6 +7,7 @@ import type {
 } from '../../types'
 import c from 'ansis'
 import { minVersion } from 'semver-es'
+import { builtinAddons } from '../../addons'
 import {
   colorizeNodeCompatibility,
   colorizeVersionDiff,
@@ -69,14 +70,21 @@ function formatProvenance(value: boolean | 'trustedPublisher' | undefined) {
   return value === 'trustedPublisher' ? 'trusted' : value ? 'provenance' : 'untrusted'
 }
 
-export function renderChanges(
+export async function renderChanges(
   pkg: PackageMeta,
   options: CheckOptions,
   interactive?: InteractiveContext,
 ) {
   const { resolved, relative: filepath } = pkg
-  const lines: string[] = []
+  let lines: string[] = []
   const errLines: string[] = []
+
+  const addons = options.addons || builtinAddons
+
+  for (const addon of addons) {
+    if (addon.beforeRenderChanges)
+      lines = await addon.beforeRenderChanges(lines, pkg, options, interactive)
+  }
 
   let changes = options.all
     ? resolved
@@ -120,16 +128,26 @@ export function renderChanges(
       '',
     )
 
-    const table = formatTable(
-      changes.map(c => renderChange(
-        c,
-        interactive,
-        group,
-        options.timediff ?? true,
-        options.nodecompat ?? true,
-      )),
-      'LLRRRRRLL',
+    const timediff = options.timediff ?? true
+    const nodecompat = options.nodecompat ?? true
+    const context = { interactive, grouped: group, timediff, nodecompat }
+
+    const columnsList = await Promise.all(
+      changes.map(async (change) => {
+        let columns = renderChange(change, interactive, group, timediff, nodecompat)
+        for (const addon of addons) {
+          if (addon.beforeRenderChange)
+            columns = await addon.beforeRenderChange(columns, change, context)
+        }
+        for (const addon of addons) {
+          if (addon.afterRenderChange)
+            columns = await addon.afterRenderChange(columns, change, context)
+        }
+        return columns
+      }),
     )
+
+    const table = formatTable(columnsList, 'LLRRRRRLL')
 
     const changeToTable = new Map(changes.map((change, idx) => [change, table[idx]]))
 
@@ -177,6 +195,11 @@ export function renderChanges(
     lines.push()
   }
 
+  for (const addon of addons) {
+    if (addon.afterRenderChanges)
+      lines = await addon.afterRenderChanges(lines, pkg, options, interactive)
+  }
+
   return {
     lines,
     errLines,
@@ -209,15 +232,15 @@ export function outputErr(errLines: string[]) {
   console.error()
 }
 
-export function renderPackages(resolvePkgs: PackageMeta[], options: CheckOptions) {
+export async function renderPackages(resolvePkgs: PackageMeta[], options: CheckOptions) {
+  const results = await Promise.all(resolvePkgs.map(pkg => renderChanges(pkg, options)))
   const lines: string[] = ['']
   const errLines: string[] = []
 
-  resolvePkgs.forEach((pkg) => {
-    const result = renderChanges(pkg, options)
+  for (const result of results) {
     lines.push(...result.lines)
     errLines.push(...result.errLines)
-  })
+  }
 
   return { lines, errLines }
 }
